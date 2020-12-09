@@ -63,13 +63,13 @@ contract NEONToken is Context, IERC20, Pausable {
         _transferFee = 1;
 
         // presale 5,000
-        _mint(presale, 500010e18);
+        _mint(presale, 5000E18);
         // Uniswap pool 4,250
-        _mint(uniswap, 425010e18);
+        _mint(uniswap, 4250E18);
         // Marketing 500
-        _mint(marketing, 50010e18);
+        _mint(marketing, 500E18);
         // Team 250
-        _mint(team, 25010e18);
+        _mint(team, 250E18);
     }
 
     /**
