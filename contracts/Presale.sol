@@ -16,30 +16,30 @@ contract Presale is Ownable {
     uint256 private _depositMinAmount;
     uint256 private _depositMaxAmount;
     address private _tokenAddress;
-    uint256 private _tokenPerETH;
+    uint256 private _rate;
 
     mapping(address => uint256) _depositedAmounts;
 
     event Deposited(address account, uint256 amount);
-    event SentToken(address account, uint256 amount);
+    event SentToken(address account, uint256 fund, uint256 amount);
     
     constructor() {
         // Number of tokens per 1 ETH = 5 (initial value)
-        _tokenPerETH = 5;
+        _rate = 5;
         // Minimum deposit amount  = 0.5 ETH (initial value)
-        _depositMinAmount = 51e17;
+        _depositMinAmount = 5E17;
         // Maximum deposit amount  = 20 ETH (initial value)
-        _depositMaxAmount = 201e18;
+        _depositMaxAmount = 20E18;
     }
 
     // get number of tokens per 1 ETH
-    function getNumberOfTokensPerETH() external view returns (uint256) {
-        return _tokenPerETH;
+    function getRate() external view returns (uint256) {
+        return _rate;
     }
 
     // set number of tokens per 1 ETH
-    function setNumberOfTokensPerETH(uint256 tokenPerETH) external onlyOwner {
-        _tokenPerETH = tokenPerETH;
+    function setRate(uint256 rate) external onlyOwner {
+        _rate = rate;
     }
 
     // get min amount to deposite
@@ -96,10 +96,10 @@ contract Presale is Ownable {
         emit Deposited(_msgSender(), fund);
 
         // send token to user
-        uint256 tokenAmount = fund.mul(_tokenPerETH);
+        uint256 tokenAmount = fund.mul(_rate);
         INEON(_tokenAddress).transferForPresale(_msgSender(), tokenAmount);
 
-        emit SentToken(_msgSender(), tokenAmount);
+        emit SentToken(_msgSender(), fund, tokenAmount);
     }
 
     // Withdraw eth to owner when need it
