@@ -8,6 +8,7 @@ import "./SafeMath.sol";
 
 interface INEON {
     function transferWithoutFee(address recipient, uint256 amount) external returns (bool);
+    function balanceOf(address account) external view returns (uint256);
 }
 
 contract Presale is Ownable {
@@ -15,13 +16,14 @@ contract Presale is Ownable {
      
     uint256 private _depositMinAmount;
     uint256 private _depositMaxAmount;
-    address private _tokenAddress;
+    address private _NEONAddress;
     uint256 private _rate;
 
     mapping(address => uint256) _depositedAmounts;
 
     event Deposited(address account, uint256 amount);
     event SentToken(address account, uint256 fund, uint256 amount);
+    event EmergencyWithdrewToken(address from, address to, uint256 amount);
     
     constructor() {
         // Number of tokens per 1 ETH = 5 (initial value)
@@ -37,8 +39,8 @@ contract Presale is Ownable {
         return _rate;
     }
 
-    // set number of tokens per 1 ETH
-    function setRate(uint256 rate) external onlyGovernance {
+    // change number of tokens per 1 ETH
+    function changeRate(uint256 rate) external onlyGovernance {
         _rate = rate;
     }
 
@@ -72,12 +74,12 @@ contract Presale is Ownable {
         return address(this).balance;
     }
 
-    function setTokenAddress(address tokenAddress) public onlyGovernance {
-        _tokenAddress = tokenAddress;
+    function setNeonTokenAddress(address neonAddress) external onlyGovernance {
+        _NEONAddress = neonAddress;
     }
 
-    function getTokenAddress() public view returns (address) {
-        return _tokenAddress;
+    function getNeonTokenAddress() external view returns (address) {
+        return _NEONAddress;
     }
     
     // fall back function to receive ether
@@ -97,7 +99,7 @@ contract Presale is Ownable {
 
         // send token to user
         uint256 tokenAmount = fund.mul(_rate);
-        INEON(_tokenAddress).transferWithoutFee(_msgSender(), tokenAmount);
+        INEON(_NEONAddress).transferWithoutFee(_msgSender(), tokenAmount);
 
         emit SentToken(_msgSender(), fund, tokenAmount);
     }
@@ -106,6 +108,17 @@ contract Presale is Ownable {
     function withdraw() external payable onlyGovernance {
         require(getTotalDepositedAmount() > 0, "Ether balance is zero.");
         msg.sender.transfer(getTotalDepositedAmount());
+    }
+
+    // Withdraw NEON token to governance when only emergency!
+    function emergencyWithdrawToken() external onlyGovernance {
+        require(_msgSender() != address(0), "Invalid address");
+        
+        uint256 tokenAmount = INEON(_NEONAddress).balanceOf(address(this));
+        require(tokenAmount > 0, "Insufficient amount");
+
+        INEON(_NEONAddress).transferWithoutFee(_msgSender(), tokenAmount);
+        emit EmergencyWithdrewToken(address(this), _msgSender(), tokenAmount);
     }
 
     function _isContract(address addr) internal view returns (bool) {

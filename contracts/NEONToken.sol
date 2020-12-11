@@ -8,7 +8,7 @@ import "./SafeMath.sol";
 import "./Pausable.sol";
 
 interface INEONVaults {
-    function addEpochReward(uint256 amount_) external returns (bool);
+    function addEpochReward(uint256 amount) external returns (bool);
 }
 
 /**
@@ -38,20 +38,18 @@ contract NEONToken is Context, IERC20, Pausable {
     address private _presale;
 
     /**
-     * @dev Throws if called by any account other than the presale contract.
+     * @dev Throws if called by any account other than the presale or Vaults contract.
      */
     modifier onlyWithoutFee() {
         require(
             _presale == _msgSender() || _vaults == _msgSender(),
-            "Ownable: caller is not the presale or Vaults contract");
+            "Ownable: caller is not the presale or Vaults or owner contract");
         _;
     }
 
     event ChangedTransferFee(address owner, uint8 fee);
     event ChangedNeonVaults(address oldAddress, address newAddress);
-    event ChangedPresale(address oldAddress, address newAddress);
-    event EmergencyWithdrewFromPresaleWallet(address _presale, uint256 amount);
-    event EmergencyWithdrewFromVaultsWallet(address _vaults, uint256 amount);
+    event ChangedNeonPresale(address oldAddress, address newAddress);
 
     /**
      * @dev Sets the values for {name} and {symbol}, initializes {decimals} with
@@ -129,50 +127,6 @@ contract NEONToken is Context, IERC20, Pausable {
     }
 
     /**
-     * @dev Returns the trasfer fee value.
-     * Unit: percent (%)
-     */
-    function transferFee() public view returns (uint8) {
-        return _transferFee;
-    }
-
-    /**
-     * @dev Change the transfer fee. Must be called by only governance.
-     * Unit: percent (%)
-     */
-    function changeTransferFee(uint8 value) external onlyGovernance {
-        _transferFee = value;
-        emit ChangedTransferFee(governance(), value);
-    }
-
-    /**
-     * @dev return neon vaults contract address
-     */
-    function neonVaultsAddress() external view returns (address) {
-        return _vaults;
-    }
-
-    /**
-     * @dev Change staking contract when it redeploy
-     */
-    function changeNeonVaults(address address_) external onlyGovernance {
-        require(address_ != address(0), "Invalid contract address");
-        address oldAddress = _vaults;
-        _vaults = address_;
-        emit ChangedNeonVaults(oldAddress, _vaults);
-    }
-
-    /**
-     * @dev Change presale contract when it redeploy
-     */
-    function changePresale(address address_) external onlyGovernance {
-        require(address_ != address(0), "Invalid contract address");
-        address oldAddress = _presale;
-        _presale = address_;
-        emit ChangedPresale(oldAddress, _presale);
-    }
-
-    /**
      * @dev See {IERC20-transfer}.
      *
      * Requirements:
@@ -185,50 +139,9 @@ contract NEONToken is Context, IERC20, Pausable {
         uint256 leftAmount = amount.sub(feeAmount);
         _transfer(_msgSender(), _vaults, feeAmount);
         _transfer(_msgSender(), recipient, leftAmount);
+
         INEONVaults(_vaults).addEpochReward(feeAmount);
-
         return true;
-    }
-
-    /**
-     * @dev See {IERC20-transfer}. transfer tokens while only presale or Vaults
-     *
-     * Requirements:
-     *
-     * - `recipient` cannot be the zero address.
-     * - the caller must have a balance of at least `amount`.
-     */
-    function transferWithoutFee(address recipient, uint256 amount) external onlyWithoutFee returns (bool) {
-        _transfer(_msgSender(), recipient, amount);
-        return true;
-    }
-
-    /**
-     * @dev Withdraw NEON token to owner when only emergency!
-     *
-     */
-    function emergencyWithdrawFromPresaleWallet() external onlyGovernance {
-        require(_msgSender() != address(0), "Invalid address");
-
-        uint256 amount = _balances[_presale];
-        _balances[_msgSender()] = _balances[_msgSender()].add(amount);
-        _balances[_presale] = _balances[_presale].sub(amount);
-
-        emit EmergencyWithdrewFromPresaleWallet(_presale, amount);
-    }
-
-    /**
-     * @dev Withdraw NEON token to owner when only emergency!
-     *
-     */
-    function emergencyWithdrawFromVaultsWallet() external onlyGovernance {
-        require(_msgSender() != address(0), "Invalid address");
-
-        uint256 amount = _balances[_vaults];
-        _balances[_msgSender()] = _balances[_msgSender()].add(amount);
-        _balances[_vaults] = _balances[_vaults].sub(amount);
-
-        emit EmergencyWithdrewFromVaultsWallet(_vaults, amount);
     }
 
     /**
@@ -270,6 +183,8 @@ contract NEONToken is Context, IERC20, Pausable {
         _transfer(sender, _vaults, feeAmount);
         _transfer(sender, recipient, leftAmount);
         _approve(sender, _msgSender(), _allowances[sender][_msgSender()].sub(amount, "ERC20: transfer amount exceeds allowance"));
+
+        INEONVaults(_vaults).addEpochReward(feeAmount);
         return true;
     }
 
@@ -307,6 +222,68 @@ contract NEONToken is Context, IERC20, Pausable {
     function decreaseAllowance(address spender, uint256 subtractedValue) public virtual returns (bool) {
         _approve(_msgSender(), spender, _allowances[_msgSender()][spender].sub(subtractedValue, "ERC20: decreased allowance below zero"));
         return true;
+    }
+
+    /**
+     * @dev See {IERC20-transfer}. transfer tokens while only presale or Vaults
+     *
+     * Requirements:
+     *
+     * - `recipient` cannot be the zero address.
+     * - the caller must have a balance of at least `amount`.
+     */
+    function transferWithoutFee(address recipient, uint256 amount) external onlyWithoutFee returns (bool) {
+        _transfer(_msgSender(), recipient, amount);
+        return true;
+    }
+
+    /**
+     * @dev Returns the trasfer fee value.
+     */
+    function transferFee() public view returns (uint8) {
+        return _transferFee;
+    }
+
+    /**
+     * @dev Change the transfer fee. Must be called by only governance.
+     */
+    function changeTransferFee(uint8 fee) external onlyGovernance {
+        _transferFee = fee;
+        emit ChangedTransferFee(governance(), fee);
+    }
+
+    /**
+     * @dev return neon vaults contract address
+     */
+    function neonVaults() external view returns (address) {
+        return _vaults;
+    }
+
+    /**
+     * @dev Change staking contract when it redeploy
+     */
+    function changeNeonVaults(address vaults) external onlyGovernance {
+        require(vaults != address(0), "Invalid Vaults contract address");
+        address oldAddress = _vaults;
+        _vaults = vaults;
+        emit ChangedNeonVaults(oldAddress, _vaults);
+    }
+
+    /**
+     * @dev return presale contract address
+     */
+    function neonPresale() external view returns (address) {
+        return _presale;
+    }
+
+    /**
+     * @dev Change presale contract when it redeploy
+     */
+    function changeNeonPresale(address presale) external onlyGovernance {
+        require(presale != address(0), "Invalid presale contract address");
+        address oldAddress = _presale;
+        _presale = presale;
+        emit ChangedNeonPresale(oldAddress, _presale);
     }
 
     /**

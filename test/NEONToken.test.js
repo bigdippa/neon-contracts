@@ -1,10 +1,12 @@
 const BigNumber = require('bignumber.js');
 const { ADDRESS } = require('../config');
 const NEONToken = require('./abis/NEONToken.json');
+const NEONVaults = require('./abis/NEONVaults.json');
 const Presale = require('./abis/Presale.json');
 
 contract("NEONToken test", async accounts => {
   const NEON = await new web3.eth.Contract(NEONToken.abi, NEONToken.address);
+  const NEONVault = await new web3.eth.Contract(NEONVaults.abi, NEONVaults.address);
 
   it("Should put 0 NEONToken in the first account", async () => {
     const balance = await NEON.methods.balanceOf(accounts[0]).call();
@@ -102,39 +104,57 @@ contract("NEONToken test", async accounts => {
     assert.equal(paused, false);
   });
 
-  // it("Should send token correctly", async () => {
-  //   const account_one = '0xc76F07D4FF0aa6B21351D61218C111eEd481287c';
-  //   const account_two = accounts[0];
-  //   const amount = new BigNumber(1000000E18);
-  //   let balance = await NEON.methods.balanceOf(account_one).call();
-  //   const account_one_starting_balance = new BigNumber(balance);
-  //   balance = new BigNumber(3500000E18);
-  //   assert.equal(account_one_starting_balance.toNumber(), balance.toNumber());
+  it("Should be NEONVaults address is zero in initial", async () => {
+    const address = await NEON.methods.neonVaults().call();
+    assert.equal(address, 0);
+  });
 
-  //   balance = await NEON.methods.balanceOf(account_two).call();
-  //   const account_two_starting_balance = new BigNumber(balance);
-  //   balance = new BigNumber(0);
-  //   assert.equal(account_two_starting_balance.toNumber(), balance.toNumber());
+  it("Should be changed NEONVaults address to " + NEONVaults.address, async () => {
+    await NEON.methods.changeNeonVaults(NEONVaults.address).send({ from: accounts[0] });
+    const address = await NEON.methods.neonVaults().call();
+    assert.equal(address, NEONVaults.address);
+  });
 
-  //   //await NEON.approve(account_two, amount, {from: account_one});
-  //   //await NEON.transfer(account_two, amount, { from: account_one });
-  //   await NEON.methods.approve(account_two, amount).send({ from: account_one });
-  //   await NEON.methods.transfer(account_two, amount).send({ from: account_one });
+  it("Should be presale address is " + Presale.address, async () => {
+    const address = await NEON.methods.neonPresale().call();
+    assert.equal(address, Presale.address);
+  });
 
-  //   balance = await NEON.methods.balanceOf(account_one).call();
-  //   const account_one_ending_balance = new BigNumber(balance);
-  //   balance = await NEON.methods.balanceOf(account_two).call();
-  //   const account_two_ending_balance = new BigNumber(balance);
+  it("Should be changed presale address to " + accounts[1], async () => {
+    await NEON.methods.changeNeonPresale(accounts[1]).send({ from: accounts[0] });
+    const address = await NEON.methods.neonPresale().call();
+    assert.equal(address, accounts[1]);
 
-  //   assert.equal(
-  //     account_one_ending_balance.toNumber(),
-  //     account_one_starting_balance.minus(amount).toNumber(),
-  //     "Amount wasn't correctly taken from the sender"
-  //   );
-  //   assert.equal(
-  //     account_two_ending_balance.toNumber(),
-  //     account_two_starting_balance.plus(amount).toNumber(),
-  //     "Amount wasn't correctly sent to the receiver"
-  //   );
-  // });
+    await NEON.methods.changeNeonPresale(Presale.address).send({ from: accounts[0] });
+    const changedAddress = await NEON.methods.neonPresale().call();
+    assert.equal(changedAddress, Presale.address);
+
+  });
+
+  it("Should be sent token correctly", async () => {
+    // change neon address in NEONVaults
+    await NEONVault.methods.changeNeonAddress(NEONToken.address).send({ from: accounts[0] });
+    const NEONAddress = await NEONVault.methods.neonAddress().call();
+    assert.equal(NEONAddress, NEONToken.address);
+
+    const transferFee = new BigNumber(await NEON.methods.transferFee().call());
+    const sendAmount = new BigNumber(100E18);
+    const feeAmount = sendAmount.times(transferFee).div(10000);
+
+    // send 100 token from market to accounts[0]
+    const expectedBalance = sendAmount.minus(feeAmount);
+    let marketBalance = new BigNumber(await NEON.methods.balanceOf(ADDRESS.AIRDROP_MARKET).call());
+    const restBalance = marketBalance.minus(sendAmount);
+
+    // await NEON.methods.approve(accounts[0], sendAmount.toString(10)).send({ from: Presale.address });
+    // await NEON.methods.transferFrom(Presale.address, accounts[0], sendAmount.toString(10)).send({ from: Presale.address });
+    await NEON.methods.transfer(accounts[0], sendAmount.toString(10)).send({ from: ADDRESS.AIRDROP_MARKET });
+    const receivedBalance = new BigNumber(await NEON.methods.balanceOf(accounts[0]).call());
+    const vaultsBalance = new BigNumber(await NEON.methods.balanceOf(NEONVaults.address).call());
+    marketBalance = new BigNumber(await NEON.methods.balanceOf(ADDRESS.AIRDROP_MARKET).call());
+    
+    assert.equal(receivedBalance.toString(10), expectedBalance.toString(10));
+    assert.equal(restBalance.toString(10), marketBalance.toString(10));
+    assert.equal(feeAmount.toString(10), vaultsBalance.toString(10));
+  });
 });
