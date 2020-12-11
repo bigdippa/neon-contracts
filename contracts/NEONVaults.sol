@@ -21,7 +21,7 @@ contract NEONVaults is Context, Ownable {
     
     // States
     address private _uniswapV2Pair;
-    address private _NEONAddress;
+    address private _neonAddress;
     address private _devAddress;
     uint16 private _devFee;
 
@@ -29,8 +29,8 @@ contract NEONVaults is Context, Ownable {
     // It is `1 days` by default and could be changed
     // later only by Governance
     uint256 private _rewardPeriod;
-    // save the timestamp for every day's reward
-    uint256 private _prevTime;
+    // save the timestamp for every period's reward
+    uint256 private _lastRewardedTime;
     uint256 private _contractStartTime;
     uint256 private _totalStakedAmount;
 
@@ -57,15 +57,15 @@ contract NEONVaults is Context, Ownable {
      * @dev Throws if called by any account other than the NEON token contract.
      */
     modifier onlyNeon() {
-        require(_NEONAddress == _msgSender(), "Ownable: caller is not the NEON token contract");
+        require(_neonAddress == _msgSender(), "Ownable: caller is not the NEON token contract");
         _;
     }
 
     constructor() {
         _rewardPeriod = 1 days;
         _contractStartTime = block.timestamp;
-        _prevTime = _contractStartTime;
-        _devFee = 425;
+        _lastRewardedTime = _contractStartTime;
+        _devFee = 400;
     }
 
     /**
@@ -73,6 +73,13 @@ contract NEONVaults is Context, Ownable {
      */
     function rewardPeriod() public view returns (uint256) {
         return _rewardPeriod;
+    }
+
+    /**
+     * @dev Return contract started time
+     */
+    function contractStartTime() public view returns (uint256) {
+        return _contractStartTime;
     }
 
     /**
@@ -102,14 +109,14 @@ contract NEONVaults is Context, Ownable {
      * @dev Return address of NEON Token contract
      */
     function neonAddress() public view returns (address) {
-        return _NEONAddress;
+        return _neonAddress;
     }
 
     /**
      * @dev Change NEON Token contract address. Call by only Governance.
      */
     function changeNeonAddress(address NEONAddress_) external onlyGovernance {
-        _NEONAddress = NEONAddress_;
+        _neonAddress = NEONAddress_;
         emit ChangedNeonAddress(governance(), NEONAddress_);
     }
 
@@ -141,12 +148,12 @@ contract NEONVaults is Context, Ownable {
     function addEpochReward(uint256 amount_) external onlyNeon returns (bool) {
         uint256 blockTime = block.timestamp;
 
-        if (blockTime.sub(_prevTime) >= _rewardPeriod) {
-            uint256 currentTime = _prevTime.add(_rewardPeriod);
+        if (blockTime.sub(_lastRewardedTime) >= _rewardPeriod) {
+            uint256 currentTime = _lastRewardedTime.add(_rewardPeriod);
             _epochRewards[currentTime] = _epochRewards[currentTime].add(amount_);
-            _prevTime = currentTime;
+            _lastRewardedTime = currentTime;
         } else {
-            _epochRewards[_prevTime] = _epochRewards[_prevTime].add(amount_);
+            _epochRewards[_lastRewardedTime] = _epochRewards[_lastRewardedTime].add(amount_);
         }
 
         return true;
@@ -173,17 +180,17 @@ contract NEONVaults is Context, Ownable {
 
         // Increase epoch staked amount
         uint256 blockTime = block.timestamp;
-        if (blockTime.sub(_prevTime) >= _rewardPeriod) {
-            uint256 currentTime = _prevTime.add(_rewardPeriod);
+        if (blockTime.sub(_lastRewardedTime) >= _rewardPeriod) {
+            uint256 currentTime = _lastRewardedTime.add(_rewardPeriod);
             _epochTotalStakedAmounts[currentTime] = amount_;
             _userStartedTimes[_msgSender()] = currentTime;
-            _prevTime = currentTime;
+            _lastRewardedTime = currentTime;
         } else {
-            _epochTotalStakedAmounts[_prevTime] = _epochTotalStakedAmounts[_prevTime].add(amount_);
+            _epochTotalStakedAmounts[_lastRewardedTime] = _epochTotalStakedAmounts[_lastRewardedTime].add(amount_);
         }
 
         // Increase staked amount of the staker
-        _userEpochStakedAmounts[_prevTime][_msgSender()] = _userEpochStakedAmounts[_prevTime][_msgSender()].add(amount_);
+        _userEpochStakedAmounts[_lastRewardedTime][_msgSender()] = _userEpochStakedAmounts[_lastRewardedTime][_msgSender()].add(amount_);
         _userTotalStakedAmounts[_msgSender()] = _userTotalStakedAmounts[_msgSender()].add(amount_);
 
         emit Staked(_msgSender(), amount_);
@@ -300,10 +307,10 @@ contract NEONVaults is Context, Ownable {
     function emergencyWithdrawToken() external onlyGovernance {
         require(_msgSender() != address(0), "Invalid address");
         
-        uint256 tokenAmount = INEON(_NEONAddress).balanceOf(address(this));
+        uint256 tokenAmount = INEON(_neonAddress).balanceOf(address(this));
         require(tokenAmount > 0, "Insufficient amount");
 
-        INEON(_NEONAddress).transferWithoutFee(_msgSender(), tokenAmount);
+        INEON(_neonAddress).transferWithoutFee(_msgSender(), tokenAmount);
         emit EmergencyWithdrewToken(address(this), _msgSender(), tokenAmount);
     }
 
@@ -316,14 +323,14 @@ contract NEONVaults is Context, Ownable {
 
         // Transfer reward tokens from contract to staker
         require(
-            INEON(_NEONAddress).transferWithoutFee(_msgSender(),
+            INEON(_neonAddress).transferWithoutFee(_msgSender(),
             rewards.sub(devFee)), 
             "It has failed to transfer tokens from contract to staker."
         );
 
         // Transfer devFee tokens from contract to devAddress
         require(
-            INEON(_NEONAddress).transferWithoutFee(_devAddress,
+            INEON(_neonAddress).transferWithoutFee(_devAddress,
             devFee), 
             "It has failed to transfer tokens from contract to staker."
         );

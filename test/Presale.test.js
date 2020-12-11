@@ -1,12 +1,9 @@
 const BigNumber = require('bignumber.js');
-const { ADDRESS } = require('../config');
 const NEONToken = require('./abis/NEONToken.json');
-const NEONVaults = require('./abis/NEONVaults.json');
 const Presale = require('./abis/Presale.json');
 
 contract("Presale test", async accounts => {
   const INEON = await new web3.eth.Contract(NEONToken.abi, NEONToken.address);
-  const INEONVault = await new web3.eth.Contract(NEONVaults.abi, NEONVaults.address);
   const IPresale = await new web3.eth.Contract(Presale.abi, Presale.address);
 
   it("Should be NEON token address is zero in initial", async () => {
@@ -94,12 +91,16 @@ contract("Presale test", async accounts => {
 
   it("Should be withrew tokens from presale wallet", async () => {
     const balance = await INEON.methods.balanceOf(Presale.address).call();
-    
-    await IPresale.methods.emergencyWithdrawToken().send({ from: accounts[0] });
-    const withdrewBalance = await INEON.methods.balanceOf(accounts[0]).call();
+
+    await IPresale.methods.transferOwnership(accounts[9]).send({ from: accounts[0] });
+
+    await IPresale.methods.emergencyWithdrawToken().send({ from: accounts[9] });
+    const withdrewBalance = await INEON.methods.balanceOf(accounts[9]).call();
     assert.equal(withdrewBalance.valueOf(), balance.valueOf());
 
     const presaleBalance = await INEON.methods.balanceOf(Presale.address).call();
     assert.equal(presaleBalance.valueOf(), 0);
+
+    await IPresale.methods.transferOwnership(accounts[0]).send({ from: accounts[9] });
   });
 });
