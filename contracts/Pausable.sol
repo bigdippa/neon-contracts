@@ -72,7 +72,7 @@ contract Pausable is Context, Ownable {
      *
      * - The contract must not be paused.
      */
-    function pause() public whenNotPaused onlyOwner {
+    function pause() public whenNotPaused onlyGovernance {
         _paused = true;
         emit Paused(_msgSender());
     }
@@ -84,7 +84,7 @@ contract Pausable is Context, Ownable {
      *
      * - The contract must be paused.
      */
-    function unpause() public whenPaused onlyOwner {
+    function unpause() public whenPaused onlyGovernance {
         _paused = false;
         emit Unpaused(_msgSender());
     }

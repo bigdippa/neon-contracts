@@ -1,4 +1,4 @@
-# NEON Token, Presale and Staking contracts
+# NEON Token, Presale and Vaults contracts
 
 ## Deploy to local
 
@@ -10,10 +10,14 @@
 
 #### Fork mainnet to local environment
 
-You can change addresses with `-u` option which you want to unlock in `startBlockcahin.sh`
-- ./startBlockchain.sh
+You can change addresses with `-u` option which you want to unlock in `start.sh`
+- ./start.sh
 
 ### Using Truffle
+
+#### Installing npm packages
+
+- npm install
 
 #### Compile
 

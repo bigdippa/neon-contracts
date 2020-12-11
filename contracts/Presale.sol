@@ -7,7 +7,7 @@ import "./Ownable.sol";
 import "./SafeMath.sol";
 
 interface INEON {
-    function transferForPresale(address recipient, uint256 amount) external returns (bool);
+    function transferWithoutFee(address recipient, uint256 amount) external returns (bool);
 }
 
 contract Presale is Ownable {
@@ -38,7 +38,7 @@ contract Presale is Ownable {
     }
 
     // set number of tokens per 1 ETH
-    function setRate(uint256 rate) external onlyOwner {
+    function setRate(uint256 rate) external onlyGovernance {
         _rate = rate;
     }
 
@@ -48,7 +48,7 @@ contract Presale is Ownable {
     }
 
     // set min amount to deposite
-    function setDepositeMinAmount(uint256 minAmount) external onlyOwner {
+    function setDepositeMinAmount(uint256 minAmount) external onlyGovernance {
         _depositMinAmount = minAmount;
     }
 
@@ -58,7 +58,7 @@ contract Presale is Ownable {
     }
 
     // set max amount to deposite
-    function setDepositeMaxAmount(uint256 maxAmount) external onlyOwner {
+    function setDepositeMaxAmount(uint256 maxAmount) external onlyGovernance {
         _depositMaxAmount = maxAmount;
     }
 
@@ -72,7 +72,7 @@ contract Presale is Ownable {
         return address(this).balance;
     }
 
-    function setTokenAddress(address tokenAddress) public onlyOwner {
+    function setTokenAddress(address tokenAddress) public onlyGovernance {
         _tokenAddress = tokenAddress;
     }
 
@@ -87,7 +87,7 @@ contract Presale is Ownable {
     
     function _deposite() private {
         require(!_isContract(_msgSender()), "Could not be a contract");
-        require(owner() != _msgSender(), "You are onwer.");
+        require(governance() != _msgSender(), "You are onwer.");
         require(msg.value >= _depositMinAmount, "Should be great than minimum deposit amount.");
         require(msg.value <= _depositMaxAmount, "Should be less than maximum deposit amount.");
 
@@ -97,13 +97,13 @@ contract Presale is Ownable {
 
         // send token to user
         uint256 tokenAmount = fund.mul(_rate);
-        INEON(_tokenAddress).transferForPresale(_msgSender(), tokenAmount);
+        INEON(_tokenAddress).transferWithoutFee(_msgSender(), tokenAmount);
 
         emit SentToken(_msgSender(), fund, tokenAmount);
     }
 
     // Withdraw eth to owner when need it
-    function withdraw() external payable onlyOwner {
+    function withdraw() external payable onlyGovernance {
         require(getTotalDepositedAmount() > 0, "Ether balance is zero.");
         msg.sender.transfer(getTotalDepositedAmount());
     }

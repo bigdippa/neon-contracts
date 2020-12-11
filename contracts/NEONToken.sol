@@ -7,6 +7,10 @@ import "./IERC20.sol";
 import "./SafeMath.sol";
 import "./Pausable.sol";
 
+interface INEONVaults {
+    function addEpochReward(uint256 amount_) external returns (bool);
+}
+
 /**
  * 'NEON' token contract
  * 
@@ -30,22 +34,24 @@ contract NEONToken is Context, IERC20, Pausable {
     uint8 private _decimals;
 
     uint8 private _transferFee;
-    address private _stakingContract;
+    address private _vaults;
     address private _presale;
 
     /**
      * @dev Throws if called by any account other than the presale contract.
      */
-    modifier onlyPresale() {
-        require(_presale == _msgSender(), "Ownable: caller is not the presale contract");
+    modifier onlyWithoutFee() {
+        require(
+            _presale == _msgSender() || _vaults == _msgSender(),
+            "Ownable: caller is not the presale or Vaults contract");
         _;
     }
 
     event ChangedTransferFee(address owner, uint8 fee);
-    event ChangedStakingContract(address oldAddress, address newAddress);
-    event ChangedPresaleContract(address oldAddress, address newAddress);
-    event EmergencyWithdrewFromPresale(address _presale, uint256 amount);
-    event EmergencyWithdrewFromStakingPool(address _stakingContract, uint256 amount);
+    event ChangedNeonVaults(address oldAddress, address newAddress);
+    event ChangedPresale(address oldAddress, address newAddress);
+    event EmergencyWithdrewFromPresaleWallet(address _presale, uint256 amount);
+    event EmergencyWithdrewFromVaultsWallet(address _vaults, uint256 amount);
 
     /**
      * @dev Sets the values for {name} and {symbol}, initializes {decimals} with
@@ -57,13 +63,14 @@ contract NEONToken is Context, IERC20, Pausable {
      * construction.
      */
     constructor (address presale, address uniswap, address marketing, address team) {
-        _name = 'NEON';
-        _symbol = 'NEONToken';
+        _name = 'NEONToken';
+        _symbol = 'NEON';
         _decimals = 18;
         _presale = presale;
 
         // set initial transfer fee as 1%
-        _transferFee = 1;
+        // It is allow 2 digits under point
+        _transferFee = 100;
 
         // presale 5,000
         _mint(presale, 5000E18);
@@ -130,39 +137,39 @@ contract NEONToken is Context, IERC20, Pausable {
     }
 
     /**
-     * @dev Change the transfer fee. Must be called by only owner.
+     * @dev Change the transfer fee. Must be called by only governance.
      * Unit: percent (%)
      */
-    function changeTransferFee(uint8 value) external onlyOwner {
+    function changeTransferFee(uint8 value) external onlyGovernance {
         _transferFee = value;
-        emit ChangedTransferFee(owner(), value);
+        emit ChangedTransferFee(governance(), value);
     }
 
     /**
-     * @dev return starking contract address
+     * @dev return neon vaults contract address
      */
-    function stakingContract() external view returns (address) {
-        return _stakingContract;
+    function neonVaultsAddress() external view returns (address) {
+        return _vaults;
     }
 
     /**
      * @dev Change staking contract when it redeploy
      */
-    function changeStakingContract(address address_) external onlyOwner {
+    function changeNeonVaults(address address_) external onlyGovernance {
         require(address_ != address(0), "Invalid contract address");
-        address oldAddress = _stakingContract;
-        _stakingContract = address_;
-        emit ChangedStakingContract(oldAddress, _stakingContract);
+        address oldAddress = _vaults;
+        _vaults = address_;
+        emit ChangedNeonVaults(oldAddress, _vaults);
     }
 
     /**
      * @dev Change presale contract when it redeploy
      */
-    function changePresale(address address_) external onlyOwner {
+    function changePresale(address address_) external onlyGovernance {
         require(address_ != address(0), "Invalid contract address");
         address oldAddress = _presale;
         _presale = address_;
-        emit ChangedPresaleContract(oldAddress, _presale);
+        emit ChangedPresale(oldAddress, _presale);
     }
 
     /**
@@ -174,22 +181,24 @@ contract NEONToken is Context, IERC20, Pausable {
      * - the caller must have a balance of at least `amount`.
      */
     function transfer(address recipient, uint256 amount) public virtual override whenNotPaused returns (bool) {
-        uint256 feeAmount = amount.mul(uint256(transferFee())).div(100);
+        uint256 feeAmount = amount.mul(uint256(transferFee())).div(10000);
         uint256 leftAmount = amount.sub(feeAmount);
-        _transfer(_msgSender(), _stakingContract, feeAmount);
+        _transfer(_msgSender(), _vaults, feeAmount);
         _transfer(_msgSender(), recipient, leftAmount);
+        INEONVaults(_vaults).addEpochReward(feeAmount);
+
         return true;
     }
 
     /**
-     * @dev See {IERC20-transfer}. transfer tokens while only presale
+     * @dev See {IERC20-transfer}. transfer tokens while only presale or Vaults
      *
      * Requirements:
      *
      * - `recipient` cannot be the zero address.
      * - the caller must have a balance of at least `amount`.
      */
-    function transferForPresale(address recipient, uint256 amount) external whenPaused onlyPresale returns (bool) {
+    function transferWithoutFee(address recipient, uint256 amount) external onlyWithoutFee returns (bool) {
         _transfer(_msgSender(), recipient, amount);
         return true;
     }
@@ -198,28 +207,28 @@ contract NEONToken is Context, IERC20, Pausable {
      * @dev Withdraw NEON token to owner when only emergency!
      *
      */
-    function emergencyWithdrawFromPresale() external onlyOwner {
+    function emergencyWithdrawFromPresaleWallet() external onlyGovernance {
         require(_msgSender() != address(0), "Invalid address");
 
         uint256 amount = _balances[_presale];
         _balances[_msgSender()] = _balances[_msgSender()].add(amount);
         _balances[_presale] = _balances[_presale].sub(amount);
 
-        emit EmergencyWithdrewFromPresale(_presale, amount);
+        emit EmergencyWithdrewFromPresaleWallet(_presale, amount);
     }
 
     /**
      * @dev Withdraw NEON token to owner when only emergency!
      *
      */
-    function emergencyWithdrawFromStakingPool() external onlyOwner {
+    function emergencyWithdrawFromVaultsWallet() external onlyGovernance {
         require(_msgSender() != address(0), "Invalid address");
 
-        uint256 amount = _balances[_stakingContract];
+        uint256 amount = _balances[_vaults];
         _balances[_msgSender()] = _balances[_msgSender()].add(amount);
-        _balances[_stakingContract] = _balances[_stakingContract].sub(amount);
+        _balances[_vaults] = _balances[_vaults].sub(amount);
 
-        emit EmergencyWithdrewFromStakingPool(_stakingContract, amount);
+        emit EmergencyWithdrewFromVaultsWallet(_vaults, amount);
     }
 
     /**
@@ -255,10 +264,10 @@ contract NEONToken is Context, IERC20, Pausable {
      * `amount`.
      */
     function transferFrom(address sender, address recipient, uint256 amount) public virtual override whenNotPaused returns (bool) {
-        uint256 feeAmount = amount.mul(uint256(transferFee())).div(100);
+        uint256 feeAmount = amount.mul(uint256(transferFee())).div(10000);
         uint256 leftAmount = amount.sub(feeAmount);
         
-        _transfer(sender, _stakingContract, feeAmount);
+        _transfer(sender, _vaults, feeAmount);
         _transfer(sender, recipient, leftAmount);
         _approve(sender, _msgSender(), _allowances[sender][_msgSender()].sub(amount, "ERC20: transfer amount exceeds allowance"));
         return true;
