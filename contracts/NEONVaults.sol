@@ -71,14 +71,14 @@ contract NEONVaults is Context, Ownable {
     /**
      * @dev Return value of reward period
      */
-    function rewardPeriod() public view returns (uint256) {
+    function rewardPeriod() external view returns (uint256) {
         return _rewardPeriod;
     }
 
     /**
      * @dev Return contract started time
      */
-    function contractStartTime() public view returns (uint256) {
+    function contractStartTime() external view returns (uint256) {
         return _contractStartTime;
     }
 
@@ -93,7 +93,7 @@ contract NEONVaults is Context, Ownable {
     /**
      * @dev Return address of NEON-ETH Uniswap V2 pair
      */
-    function uniswapV2Pair() public view returns (address) {
+    function uniswapV2Pair() external view returns (address) {
         return _uniswapV2Pair;
     }
 
@@ -108,7 +108,7 @@ contract NEONVaults is Context, Ownable {
     /**
      * @dev Return address of NEON Token contract
      */
-    function neonAddress() public view returns (address) {
+    function neonAddress() external view returns (address) {
         return _neonAddress;
     }
 
@@ -125,7 +125,7 @@ contract NEONVaults is Context, Ownable {
      * Note onlyOwner functions are meant for the governance contract
      * allowing NEON governance token holders to do this functions.
      */
-    function changeDevFeeReciever(address devAddress_) public onlyGovernance {
+    function changeDevFeeReciever(address devAddress_) external onlyGovernance {
         address oldAddress = _devAddress;
         _devAddress = devAddress_;
         emit changedDevFeeReciever(governance(), oldAddress, _devAddress);
@@ -136,7 +136,7 @@ contract NEONVaults is Context, Ownable {
      * defaults at 4.25%
      * Note contract owner is meant to be a governance contract allowing NEON governance consensus
      */
-    function changeDevFee(uint16 devFee_) public onlyGovernance {
+    function changeDevFee(uint16 devFee_) external onlyGovernance {
         require(_devFee <= 1000, 'Dev fee clamped at 10%');
         _devFee = devFee_;
     }
@@ -179,14 +179,10 @@ contract NEONVaults is Context, Ownable {
         _totalStakedAmount = _totalStakedAmount.add(amount_);
 
         // Increase epoch staked amount
-        uint256 blockTime = block.timestamp;
-        if (blockTime.sub(_lastRewardedTime) >= _rewardPeriod) {
-            uint256 currentTime = _lastRewardedTime.add(_rewardPeriod);
-            _epochTotalStakedAmounts[currentTime] = amount_;
-            _userStartedTimes[_msgSender()] = currentTime;
-            _lastRewardedTime = currentTime;
-        } else {
-            _epochTotalStakedAmounts[_lastRewardedTime] = _epochTotalStakedAmounts[_lastRewardedTime].add(amount_);
+        _epochTotalStakedAmounts[_lastRewardedTime] = _epochTotalStakedAmounts[_lastRewardedTime].add(amount_);
+        
+        if (_userStartedTimes[_msgSender()] == 0) {
+            _userStartedTimes[_msgSender()] = _lastRewardedTime;
         }
 
         // Increase staked amount of the staker
