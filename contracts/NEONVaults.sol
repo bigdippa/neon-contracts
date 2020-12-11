@@ -121,6 +121,13 @@ contract NEONVaults is Context, Ownable {
     }
 
     /**
+     * @dev Return address of dev fee receiver
+     */
+    function devFeeReciever() external view returns (address) {
+        return _devAddress;
+    }
+
+    /**
      * @dev Update dev address by the previous dev.
      * Note onlyOwner functions are meant for the governance contract
      * allowing NEON governance token holders to do this functions.
@@ -132,8 +139,15 @@ contract NEONVaults is Context, Ownable {
     }
 
     /**
+     * @dev Return dev fee
+     */
+    function devFee() external view returns (uint16) {
+        return _devFee;
+    }
+
+    /**
      * @dev Update the dev fee for this contract
-     * defaults at 4.25%
+     * defaults at 4.00%
      * Note contract owner is meant to be a governance contract allowing NEON governance consensus
      */
     function changeDevFee(uint16 devFee_) external onlyGovernance {
@@ -158,7 +172,7 @@ contract NEONVaults is Context, Ownable {
 
         return true;
     }
-    
+
     /**
      * @dev Stake NEON-ETH LP tokens
      */
@@ -315,19 +329,19 @@ contract NEONVaults is Context, Ownable {
      */
     function _withdrawRewards() internal {
         uint256 rewards = getRewards();
-        uint256 devFee = rewards.mul(uint256(_devFee)).div(10000);
+        uint256 devFeeAmount = rewards.mul(uint256(_devFee)).div(10000);
 
         // Transfer reward tokens from contract to staker
         require(
             INEON(_neonAddress).transferWithoutFee(_msgSender(),
-            rewards.sub(devFee)), 
+            rewards.sub(devFeeAmount)), 
             "It has failed to transfer tokens from contract to staker."
         );
 
         // Transfer devFee tokens from contract to devAddress
         require(
             INEON(_neonAddress).transferWithoutFee(_devAddress,
-            devFee), 
+            devFeeAmount), 
             "It has failed to transfer tokens from contract to staker."
         );
 
