@@ -27,7 +27,7 @@ contract Presale is Ownable {
         // Minimum deposit amount  = 0.5 ETH (initial value)
         _depositMinAmount = 5E17;
         // Maximum deposit amount  = 20 ETH (initial value)
-        _depositMaxAmount = 20E18;
+        _depositMaxAmount = 25E18;
     }
 
     // get number of tokens per 1 ETH
