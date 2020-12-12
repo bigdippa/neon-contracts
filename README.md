@@ -1,4 +1,4 @@
-# NEON Token, Presale and Vaults contracts
+# NEON Token, Presale and vault contracts
 
 ## Deploy to local
 

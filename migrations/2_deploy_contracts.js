@@ -2,7 +2,7 @@ const fs = require('fs');
 const { ADDRESS } = require('../config');
 const NEONToken = artifacts.require('NEONToken');
 const Presale = artifacts.require('Presale');
-const NEONVaults = artifacts.require('NEONVaults');
+const NEONVault = artifacts.require('NEONVault');
 
 function expertContractJSON(contractName, instance) {
   const path = "./test/abis/" + contractName + ".json";
@@ -21,9 +21,9 @@ function expertContractJSON(contractName, instance) {
 module.exports = async function (deployer) {
   await deployer.deploy(Presale);
   await deployer.deploy(NEONToken, Presale.address, ADDRESS.AIRDROP_UNISWAP, ADDRESS.AIRDROP_MARKET, ADDRESS.AIRDROP_TEAM);
-  await deployer.deploy(NEONVaults);
+  await deployer.deploy(NEONVault);
 
   expertContractJSON('Presale', Presale);
   expertContractJSON('NEONToken', NEONToken);
-  expertContractJSON('NEONVaults', NEONVaults);
+  expertContractJSON('NEONVault', NEONVault);
 };

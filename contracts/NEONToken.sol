@@ -3,13 +3,10 @@
 pragma solidity >=0.6.0 <0.8.0;
 
 import "./Context.sol";
-import "./IERC20.sol";
 import "./SafeMath.sol";
 import "./Pausable.sol";
-
-interface INEONVaults {
-    function addEpochReward(uint256 amount) external returns (bool);
-}
+import "./IERC20.sol";
+import "./INEONVAULT.sol";
 
 /**
  * 'NEON' token contract
@@ -34,21 +31,21 @@ contract NEONToken is Context, IERC20, Pausable {
     uint8 private _decimals;
 
     uint8 private _transferFee;
-    address private _vaults;
+    address private _vault;
     address private _presale;
 
     /**
-     * @dev Throws if called by any account other than the presale or Vaults contract.
+     * @dev Throws if called by any account other than the presale or vault contract.
      */
     modifier onlyWithoutFee() {
         require(
-            _presale == _msgSender() || _vaults == _msgSender(),
-            "Ownable: caller is not the presale or Vaults or owner contract");
+            _presale == _msgSender() || _vault == _msgSender(),
+            "Ownable: caller is not the presale or vault or owner contract");
         _;
     }
 
     event ChangedTransferFee(address owner, uint8 fee);
-    event ChangedNeonVaults(address oldAddress, address newAddress);
+    event ChangedNEONVault(address oldAddress, address newAddress);
     event ChangedNeonPresale(address oldAddress, address newAddress);
 
     /**
@@ -61,7 +58,7 @@ contract NEONToken is Context, IERC20, Pausable {
      * construction.
      */
     constructor (address presale, address uniswap, address marketing, address team) {
-        _name = 'NEONToken';
+        _name = 'Neon Vault';
         _symbol = 'NEON';
         _decimals = 18;
         _presale = presale;
@@ -137,10 +134,10 @@ contract NEONToken is Context, IERC20, Pausable {
     function transfer(address recipient, uint256 amount) public virtual override whenNotPaused returns (bool) {
         uint256 feeAmount = amount.mul(uint256(transferFee())).div(10000);
         uint256 leftAmount = amount.sub(feeAmount);
-        _transfer(_msgSender(), _vaults, feeAmount);
+        _transfer(_msgSender(), _vault, feeAmount);
         _transfer(_msgSender(), recipient, leftAmount);
 
-        INEONVaults(_vaults).addEpochReward(feeAmount);
+        INEONVault(_vault).addEpochReward(feeAmount);
         return true;
     }
 
@@ -180,11 +177,11 @@ contract NEONToken is Context, IERC20, Pausable {
         uint256 feeAmount = amount.mul(uint256(transferFee())).div(10000);
         uint256 leftAmount = amount.sub(feeAmount);
         
-        _transfer(sender, _vaults, feeAmount);
+        _transfer(sender, _vault, feeAmount);
         _transfer(sender, recipient, leftAmount);
         _approve(sender, _msgSender(), _allowances[sender][_msgSender()].sub(amount, "ERC20: transfer amount exceeds allowance"));
 
-        INEONVaults(_vaults).addEpochReward(feeAmount);
+        INEONVault(_vault).addEpochReward(feeAmount);
         return true;
     }
 
@@ -225,7 +222,7 @@ contract NEONToken is Context, IERC20, Pausable {
     }
 
     /**
-     * @dev See {IERC20-transfer}. transfer tokens while only presale or Vaults
+     * @dev See {IERC20-transfer}. transfer tokens while only presale or vault
      *
      * Requirements:
      *
@@ -253,20 +250,20 @@ contract NEONToken is Context, IERC20, Pausable {
     }
 
     /**
-     * @dev return neon vaults contract address
+     * @dev return neon vault contract address
      */
-    function neonVaults() external view returns (address) {
-        return _vaults;
+    function NEONVault() external view returns (address) {
+        return _vault;
     }
 
     /**
      * @dev Change staking contract when it redeploy
      */
-    function changeNeonVaults(address vaults) external onlyGovernance {
-        require(vaults != address(0), "Invalid Vaults contract address");
-        address oldAddress = _vaults;
-        _vaults = vaults;
-        emit ChangedNeonVaults(oldAddress, _vaults);
+    function changeNEONVault(address vault) external onlyGovernance {
+        require(vault != address(0), "Invalid vault contract address");
+        address oldAddress = _vault;
+        _vault = vault;
+        emit ChangedNEONVault(oldAddress, _vault);
     }
 
     /**

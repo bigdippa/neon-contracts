@@ -5,11 +5,7 @@ pragma solidity >=0.6.0 <0.8.0;
 import "./Context.sol";
 import "./Ownable.sol";
 import "./SafeMath.sol";
-
-interface INEON {
-    function transferWithoutFee(address recipient, uint256 amount) external returns (bool);
-    function balanceOf(address account) external view returns (uint256);
-}
+import "./INEON.sol";
 
 contract Presale is Ownable {
     using SafeMath for uint256;
@@ -31,7 +27,7 @@ contract Presale is Ownable {
         // Minimum deposit amount  = 0.5 ETH (initial value)
         _depositMinAmount = 5E17;
         // Maximum deposit amount  = 20 ETH (initial value)
-        _depositMaxAmount = 20E18;
+        _depositMaxAmount = 25E18;
     }
 
     // get number of tokens per 1 ETH

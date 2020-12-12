@@ -5,18 +5,10 @@ pragma solidity >=0.4.22 <0.8.0;
 import "./SafeMath.sol";
 import "./Context.sol";
 import "./Ownable.sol";
+import "./INEON.sol";
+import "./IUIV2PAIR.sol";
 
-interface IUniswapV2Pair {
-    function transfer(address recipient, uint amount) external returns (bool);
-    function transferFrom(address sender, address recipient, uint256 amount) external returns (bool);
-}
-
-interface INEON {
-    function transferWithoutFee(address recipient, uint amount) external returns (bool);
-    function balanceOf(address account) external view returns (uint256);
-}
-
-contract NEONVaults is Context, Ownable {
+contract NEONVault is Context, Ownable {
     using SafeMath for uint256;
     
     // States
@@ -121,6 +113,13 @@ contract NEONVaults is Context, Ownable {
     }
 
     /**
+     * @dev Return address of dev fee receiver
+     */
+    function devFeeReciever() external view returns (address) {
+        return _devAddress;
+    }
+
+    /**
      * @dev Update dev address by the previous dev.
      * Note onlyOwner functions are meant for the governance contract
      * allowing NEON governance token holders to do this functions.
@@ -132,8 +131,15 @@ contract NEONVaults is Context, Ownable {
     }
 
     /**
+     * @dev Return dev fee
+     */
+    function devFee() external view returns (uint16) {
+        return _devFee;
+    }
+
+    /**
      * @dev Update the dev fee for this contract
-     * defaults at 4.25%
+     * defaults at 4.00%
      * Note contract owner is meant to be a governance contract allowing NEON governance consensus
      */
     function changeDevFee(uint16 devFee_) external onlyGovernance {
@@ -158,7 +164,7 @@ contract NEONVaults is Context, Ownable {
 
         return true;
     }
-    
+
     /**
      * @dev Stake NEON-ETH LP tokens
      */
@@ -168,7 +174,7 @@ contract NEONVaults is Context, Ownable {
 
         // Transfer tokens from staker to the contract amount
         require(
-            IUniswapV2Pair(_uniswapV2Pair).transferFrom(
+            IUIV2PAIR(_uniswapV2Pair).transferFrom(
             _msgSender(),
             address(this), 
             amount_), 
@@ -202,7 +208,7 @@ contract NEONVaults is Context, Ownable {
 
         // Transfer LP tokens from contract to staker
         require(
-            IUniswapV2Pair(_uniswapV2Pair).transfer(
+            IUIV2PAIR(_uniswapV2Pair).transfer(
             _msgSender(), 
             amount), 
             "It has failed to transfer tokens from contract to staker."
@@ -297,7 +303,7 @@ contract NEONVaults is Context, Ownable {
     }
 
      /**
-     * @dev Withdraw NEON token from Vaults wallet to owner when only emergency!
+     * @dev Withdraw NEON token from vault wallet to owner when only emergency!
      *
      */
     function emergencyWithdrawToken() external onlyGovernance {
@@ -315,19 +321,19 @@ contract NEONVaults is Context, Ownable {
      */
     function _withdrawRewards() internal {
         uint256 rewards = getRewards();
-        uint256 devFee = rewards.mul(uint256(_devFee)).div(10000);
+        uint256 devFeeAmount = rewards.mul(uint256(_devFee)).div(10000);
 
         // Transfer reward tokens from contract to staker
         require(
             INEON(_neonAddress).transferWithoutFee(_msgSender(),
-            rewards.sub(devFee)), 
+            rewards.sub(devFeeAmount)), 
             "It has failed to transfer tokens from contract to staker."
         );
 
         // Transfer devFee tokens from contract to devAddress
         require(
             INEON(_neonAddress).transferWithoutFee(_devAddress,
-            devFee), 
+            devFeeAmount), 
             "It has failed to transfer tokens from contract to staker."
         );
 
