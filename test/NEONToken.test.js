@@ -1,12 +1,12 @@
 const BigNumber = require('bignumber.js');
 const { ADDRESS } = require('../config');
 const NEONToken = require('./abis/NEONToken.json');
-const NEONVaults = require('./abis/NEONVaults.json');
+const NEONVault = require('./abis/NEONVault.json');
 const Presale = require('./abis/Presale.json');
 
 contract("NEONToken test", async accounts => {
   const INEON = await new web3.eth.Contract(NEONToken.abi, NEONToken.address);
-  const INEONVaults = await new web3.eth.Contract(NEONVaults.abi, NEONVaults.address);
+  const INEONVault = await new web3.eth.Contract(NEONVault.abi, NEONVault.address);
 
   it("Should put 0 NEONToken in the first account", async () => {
     const balance = await INEON.methods.balanceOf(accounts[0]).call();
@@ -33,9 +33,9 @@ contract("NEONToken test", async accounts => {
     assert.equal(balance.valueOf(), 250E18);
   });
 
-  it("Should be token's name is 'NEONToken'", async () => {
+  it("Should be token's name is 'Neon Vault'", async () => {
     const name = await INEON.methods.name().call();
-    assert.equal(name, "NEONToken");
+    assert.equal(name, "Neon Vault");
   });
 
   it("Should be token's symbol is 'NEON'", async () => {
@@ -104,15 +104,15 @@ contract("NEONToken test", async accounts => {
     assert.equal(paused, false);
   });
 
-  it("Should be NEONVaults address is zero in initial", async () => {
-    const address = await INEON.methods.neonVaults().call();
+  it("Should be NEONVault address is zero in initial", async () => {
+    const address = await INEON.methods.NEONVault().call();
     assert.equal(address, 0);
   });
 
-  it("Should be changed NEONVaults address to " + NEONVaults.address, async () => {
-    await INEON.methods.changeNeonVaults(NEONVaults.address).send({ from: accounts[0] });
-    const address = await INEON.methods.neonVaults().call();
-    assert.equal(address, NEONVaults.address);
+  it("Should be changed NEONVault address to " + NEONVault.address, async () => {
+    await INEON.methods.changeNEONVault(NEONVault.address).send({ from: accounts[0] });
+    const address = await INEON.methods.NEONVault().call();
+    assert.equal(address, NEONVault.address);
   });
 
   it("Should be presale address is " + Presale.address, async () => {
@@ -132,9 +132,9 @@ contract("NEONToken test", async accounts => {
   });
 
   it("Should be sent token correctly", async () => {
-    // change neon address in NEONVaults
-    await INEONVaults.methods.changeNeonAddress(NEONToken.address).send({ from: accounts[0] });
-    const NEONAddress = await INEONVaults.methods.neonAddress().call();
+    // change neon address in NEONVault
+    await INEONVault.methods.changeNeonAddress(NEONToken.address).send({ from: accounts[0] });
+    const NEONAddress = await INEONVault.methods.neonAddress().call();
     assert.equal(NEONAddress, NEONToken.address);
 
     const transferFee = new BigNumber(await INEON.methods.transferFee().call());
@@ -150,11 +150,11 @@ contract("NEONToken test", async accounts => {
     // await INEON.methods.transferFrom(Presale.address, accounts[0], sendAmount.toString(10)).send({ from: Presale.address });
     await INEON.methods.transfer(accounts[0], sendAmount.toString(10)).send({ from: ADDRESS.AIRDROP_MARKET });
     const receivedBalance = new BigNumber(await INEON.methods.balanceOf(accounts[0]).call());
-    const vaultsBalance = new BigNumber(await INEON.methods.balanceOf(NEONVaults.address).call());
+    const vaultBalance = new BigNumber(await INEON.methods.balanceOf(NEONVault.address).call());
     marketBalance = new BigNumber(await INEON.methods.balanceOf(ADDRESS.AIRDROP_MARKET).call());
     
     assert.equal(receivedBalance.toString(10), expectedBalance.toString(10));
     assert.equal(restBalance.toString(10), marketBalance.toString(10));
-    assert.equal(feeAmount.toString(10), vaultsBalance.toString(10));
+    assert.equal(feeAmount.toString(10), vaultBalance.toString(10));
   });
 });
