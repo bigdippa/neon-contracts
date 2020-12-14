@@ -168,7 +168,7 @@ contract NEONVault is Context, Ownable {
     /**
      * @dev Stake NEON-ETH LP tokens
      */
-    function stake(uint256 amount_) public {
+    function stake(uint256 amount_) external {
         require(!_isContract(_msgSender()), "Could not be a contract");
         require(amount_ > 0, "Staking amount must be more than zero");
 
@@ -201,7 +201,7 @@ contract NEONVault is Context, Ownable {
     /**
      * @dev Unstake staked NEON-ETH LP tokens
      */
-    function unstake() public {
+    function unstake() external {
         require(!_isContract(_msgSender()), "Could not be a contract");
         uint256 amount = _userTotalStakedAmounts[_msgSender()];
         require(amount > 0, "No running stake");
@@ -213,7 +213,7 @@ contract NEONVault is Context, Ownable {
             amount), 
             "It has failed to transfer tokens from contract to staker."
         );
-        _withdrawRewards();
+        _withdrawReward();
 
         // Decrease the total staked amount
         _totalStakedAmount = _totalStakedAmount.sub(amount);
@@ -235,12 +235,12 @@ contract NEONVault is Context, Ownable {
     }
     
     /**
-     * @dev API to get staker's rewards
+     * @dev API to get staker's reward
      */
-    function getRewards() public view returns (uint256) {
+    function getReward() public view returns (uint256) {
         require(!_isContract(_msgSender()), "Could not be a contract");
 
-        uint256 rewards = 0;
+        uint256 reward = 0;
         uint256 blockTime = block.timestamp;
         uint256 startedTime = _userStartedTimes[_msgSender()];
 
@@ -250,56 +250,70 @@ contract NEONVault is Context, Ownable {
             for (uint256 i = 0; i < n; i++) {
                 uint256 rewardTime = startedTime.add(_rewardPeriod.mul(i));
                 uint256 epochRewards = _epochRewards[rewardTime];
-                uint256 epochTotalStakedAmount = _epochTotalStakedAmounts[rewardTime];
+                uint256 epochTotalStakedAmounts = _epochTotalStakedAmounts[rewardTime];
                 uint256 stakedAmount = _userEpochStakedAmounts[rewardTime][_msgSender()];
-                rewards = stakedAmount.mul(epochRewards).div(epochTotalStakedAmount).add(rewards);
+                reward = stakedAmount.mul(epochRewards).div(epochTotalStakedAmounts).add(reward);
             }
         }
 
-        return rewards;
+        return reward;
     }
 
     /**
      * @dev API to withdraw rewards to staker's wallet
      */
-    function withdrawRewards() public returns (bool) {
-        _withdrawRewards();
+    function withdrawReward() external returns (bool) {
+        _withdrawReward();
         return true;
+    }
+
+    /**
+     * @dev API to get the last rewarded time
+     */
+    function lastRewardedTime() external view returns (uint256) {
+        return _lastRewardedTime;
     }
 
     /**
      * @dev API to get the epoch rewards
      */
-    function getEpochRewards(uint256 epoch) external view returns (uint256) {
-        return _epochRewards[epoch];
+    function epochReward(uint256 epoch_) external view returns (uint256) {
+        return _epochRewards[epoch_];
     }
 
     /**
      * @dev API to get the total staked amount of all stakers
      */
-    function getTotalStakedAmount() external view returns (uint256) {
+    function totalStakedAmount() external view returns (uint256) {
         return _totalStakedAmount;
     }
 
     /**
      * @dev API to get the total epoch staked amount of all stakers
      */
-    function getEpochTotalStakedAmount(uint256 epoch) external view returns (uint256) {
-        return _epochTotalStakedAmounts[epoch];
+    function epochTotalStakedAmount(uint256 epoch_) external view returns (uint256) {
+        return _epochTotalStakedAmounts[epoch_];
     }
 
     /**
      * @dev API to get the staker's staked amount
      */
-    function getUserTotalStakedAmount() external view returns (uint256) {
+    function userTotalStakedAmount() external view returns (uint256) {
         return _userTotalStakedAmounts[_msgSender()];
     }
 
     /**
      * @dev API to get the staker's staked amount
      */
-    function getUserEpochStakedAmount(uint256 epoch) external view returns (uint256) {
-        return _userEpochStakedAmounts[epoch][_msgSender()];
+    function userEpochStakedAmount(uint256 epoch_) external view returns (uint256) {
+        return _userEpochStakedAmounts[epoch_][_msgSender()];
+    }
+
+    /**
+     * @dev API to get the staker's started time the staking
+     */
+    function userStartedTime(address account_) external view returns (uint256) {
+        return _userStartedTimes[account_];
     }
 
      /**
@@ -319,8 +333,8 @@ contract NEONVault is Context, Ownable {
     /**
      * @dev Low level withdraw internal function
      */
-    function _withdrawRewards() internal {
-        uint256 rewards = getRewards();
+    function _withdrawReward() internal {
+        uint256 rewards = getReward();
         uint256 devFeeAmount = rewards.mul(uint256(_devFee)).div(10000);
 
         // Transfer reward tokens from contract to staker

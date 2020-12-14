@@ -47,7 +47,7 @@ contract("Presale test", async accounts => {
 
   it("Should be deposit max amount is 20E18(20 ETH) in initial", async () => {
     const amount = await IPresale.methods.depositeMaxAmount().call();
-    assert.equal(amount.valueOf(), 20E18);
+    assert.equal(amount.valueOf(), 25E18);
   });
 
   it("Should be changed deposit max amount to 100E18(100 ETH)" , async () => {
