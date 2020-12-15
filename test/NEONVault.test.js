@@ -45,13 +45,7 @@ contract("NEONVault test", async accounts => {
     assert.equal(address, accounts[1]);
   });
 
-  it("Should be NEON address is zero in initial", async () => {
-    const INEONVault = await NEONVault.deployed();
-    const address = await INEONVault.neonAddress.call();
-    assert.equal(address, 0);
-  });
-
-  it("Should be changed Uniswap V2 address to " + accounts[1], async () => {
+  it("Should be changed NEON address to " + accounts[1], async () => {
     const INEONVault = await NEONVault.deployed();
     await INEONVault.changeNeonAddress(accounts[1], { from: accounts[0] });
     const address = await INEONVault.neonAddress.call();
@@ -96,14 +90,10 @@ contract("NEONVault test", async accounts => {
     const ILPTestToken = await LPTestToken.deployed();
     
     // check if airdrop done to correct addresses
-    let presaleBalance = toBNString(await INEON.balanceOf.call(IPresale.address));
-    assert.equal(presaleBalance, toBNString(5000E18));
-
     let uniswapBalance = toBNString(await INEON.balanceOf.call(ADDRESS.AIRDROP_UNISWAP));
     assert.equal(uniswapBalance, toBNString(4250E18));
 
     let marketBalance = toBN(await INEON.balanceOf.call(ADDRESS.AIRDROP_MARKET));
-    assert.equal(marketBalance.toString(10), toBNString(500E18));
 
     let teamBalance = toBNString(await INEON.balanceOf.call(ADDRESS.AIRDROP_TEAM));
     assert.equal(teamBalance, toBNString(250E18));

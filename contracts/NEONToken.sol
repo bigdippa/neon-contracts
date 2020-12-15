@@ -44,9 +44,9 @@ contract NEONToken is Context, IERC20, Pausable {
         _;
     }
 
-    event ChangedTransferFee(address owner, uint8 fee);
-    event ChangedNEONVault(address oldAddress, address newAddress);
-    event ChangedNeonPresale(address oldAddress, address newAddress);
+    event ChangedTransferFee(address indexed owner, uint8 fee);
+    event ChangedNEONVault(address indexed oldAddress, address indexed newAddress);
+    event ChangedNeonPresale(address indexed oldAddress, address indexed newAddress);
 
     /**
      * @dev Sets the values for {name} and {symbol}, initializes {decimals} with
