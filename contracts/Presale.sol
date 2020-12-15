@@ -17,9 +17,9 @@ contract Presale is Ownable {
 
     mapping(address => uint256) _depositedAmounts;
 
-    event Deposited(address account, uint256 amount);
-    event SentToken(address account, uint256 fund, uint256 amount);
-    event EmergencyWithdrewToken(address from, address to, uint256 amount);
+    event Deposited(address indexed account, uint256 amount);
+    event SentToken(address indexed account, uint256 ethAmount, uint256 tokenAmount);
+    event EmergencyWithdrewToken(address indexed from, address indexed to, uint256 amount);
     
     constructor() {
         // Number of tokens per 1 ETH = 5 (initial value)
@@ -109,15 +109,15 @@ contract Presale is Ownable {
         require(msg.value >= _depositMinAmount, "Should be great than minimum deposit amount.");
         require(msg.value <= _depositMaxAmount, "Should be less than maximum deposit amount.");
 
-        uint256 fund = msg.value;
-        _depositedAmounts[_msgSender()] = _depositedAmounts[_msgSender()].add(fund);
-        emit Deposited(_msgSender(), fund);
+        uint256 ethAmount = msg.value;
+        _depositedAmounts[_msgSender()] = _depositedAmounts[_msgSender()].add(ethAmount);
+        emit Deposited(_msgSender(), ethAmount);
 
         // send token to user
-        uint256 tokenAmount = fund.mul(uint256(_rate));
+        uint256 tokenAmount = ethAmount.mul(uint256(_rate));
         INEON(_neonTokenAddress).transferWithoutFee(_msgSender(), tokenAmount);
 
-        emit SentToken(_msgSender(), fund, tokenAmount);
+        emit SentToken(_msgSender(), ethAmount, tokenAmount);
     }
     
     // check if address is contract

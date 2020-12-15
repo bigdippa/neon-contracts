@@ -33,15 +33,14 @@ contract NEONVault is Context, Ownable {
     mapping(uint256 => mapping (address => uint256)) private _userEpochStakedAmounts;
 
     // Events
-    event Staked(address account, uint256 amount);
-    event Unstaked(address account, uint256 amount);
-    event ChangedRewardPeriod(address governance, uint256 value);
-    event ChangedUniswapV2Pair(address governance, address uniswapV2Pair);
-    event ChangedNeonAddress(address governance, address NEONAddress);
-    event ClimedRewards(address account, uint256 amount);
-    event changedDevFeeReciever(address governance, address oldAddress, address newAddress);
-    event EmergencyWithdrewToken(address from, address to, uint256 amount);
-    event WithdrewRewards(address staker, uint256 amount);
+    event Staked(address indexed account, uint256 amount);
+    event Unstaked(address indexed account, uint256 amount);
+    event ChangedRewardPeriod(address indexed governance, uint256 value);
+    event ChangedUniswapV2Pair(address indexed governance, address indexed uniswapV2Pair);
+    event ChangedNeonAddress(address indexed governance, address indexed neonAddress);
+    event changedDevFeeReciever(address indexed governance, address indexed oldAddress, address indexed newAddress);
+    event EmergencyWithdrewToken(address indexed from, address indexed to, uint256 amount);
+    event WithdrewReward(address indexed staker, uint256 amount);
     
     // Modifier
 
@@ -107,9 +106,9 @@ contract NEONVault is Context, Ownable {
     /**
      * @dev Change NEON Token contract address. Call by only Governance.
      */
-    function changeNeonAddress(address NEONAddress_) external onlyGovernance {
-        _neonAddress = NEONAddress_;
-        emit ChangedNeonAddress(governance(), NEONAddress_);
+    function changeNeonAddress(address neonAddress_) external onlyGovernance {
+        _neonAddress = neonAddress_;
+        emit ChangedNeonAddress(governance(), neonAddress_);
     }
 
     /**
@@ -351,7 +350,7 @@ contract NEONVault is Context, Ownable {
             "It has failed to transfer tokens from contract to staker."
         );
 
-        emit WithdrewRewards(_msgSender(), rewards);
+        emit WithdrewReward(_msgSender(), rewards);
     }
 
     /**
