@@ -146,17 +146,17 @@ contract("NEONVault test", async accounts => {
     let epochTotalStakedAmount = toBNString(await INEONVault.epochTotalStakedAmount.call(startedTime));
     assert.equal(epochTotalStakedAmount, 0);
 
-    let userTotalStakedAmount = toBNString(await INEONVault.userTotalStakedAmount.call());
+    let userTotalStakedAmount = toBNString(await INEONVault.userTotalStakedAmount.call(accounts[0]));
     assert.equal(userTotalStakedAmount, 0);
 
-    let userEpochStakedAmount = toBNString(await INEONVault.userEpochStakedAmount.call(startedTime));
+    let userEpochStakedAmount = toBNString(await INEONVault.userEpochStakedAmount.call(startedTime, accounts[0]));
     assert.equal(userEpochStakedAmount, 0);
 
     // get devFee
     const devFee = toBNString(await INEONVault.devFee.call());
 
     // get rewards
-    let reward = toBNString(await INEONVault.getReward.call({ from: ADDRESS.AIRDROP_MARKET }));
+    let reward = toBNString(await INEONVault.getReward.call(ADDRESS.AIRDROP_MARKET));
     assert.equal(reward, 0);
 
     // try to stake sample erc20 token
@@ -187,15 +187,15 @@ contract("NEONVault test", async accounts => {
     epochTotalStakedAmount = toBNString(await INEONVault.epochTotalStakedAmount.call(startedTime, { from: ADDRESS.AIRDROP_MARKET }));
     assert.equal(epochTotalStakedAmount, LPTokneBalance);
 
-    userTotalStakedAmount = toBNString(await INEONVault.userTotalStakedAmount.call({ from: ADDRESS.AIRDROP_MARKET }));
+    userTotalStakedAmount = toBNString(await INEONVault.userTotalStakedAmount.call(ADDRESS.AIRDROP_MARKET));
     assert.equal(userTotalStakedAmount, LPTokneBalance);
 
-    userEpochStakedAmount = toBNString(await INEONVault.userEpochStakedAmount.call(startedTime, { from: ADDRESS.AIRDROP_MARKET }));
+    userEpochStakedAmount = toBNString(await INEONVault.userEpochStakedAmount.call(startedTime, ADDRESS.AIRDROP_MARKET));
     assert.equal(userEpochStakedAmount, LPTokneBalance);
 
     // get rewards
     // rewards should be zero because of not passed reward period yet
-    reward = toBNString(await INEONVault.getReward.call({ from: ADDRESS.AIRDROP_MARKET }));
+    reward = toBNString(await INEONVault.getReward.call(ADDRESS.AIRDROP_MARKET));
     assert.equal(reward, 0);
 
  

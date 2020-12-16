@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity >=0.4.22 <0.8.0;
+pragma solidity >=0.6.0 <0.8.0;
 
 import "./SafeMath.sol";
 import "./Context.sol";
 import "./Ownable.sol";
 import "./INEON.sol";
-import "./IUIV2PAIR.sol";
+import "./IUniV2Pair.sol";
 
 contract NEONVault is Context, Ownable {
     using SafeMath for uint256;
@@ -21,20 +21,34 @@ contract NEONVault is Context, Ownable {
     // It is `1 days` by default and could be changed
     // later only by Governance
     uint256 private _rewardPeriod;
+    uint256 private _maxLockPeriod;
+    uint256 private _minLockPeriod;
+    bool private _enabledLock;
+
     // save the timestamp for every period's reward
     uint256 private _lastRewardedTime;
     uint256 private _contractStartTime;
     uint256 private _totalStakedAmount;
+    address[] private _stakerList;
+
+    struct StakerInfo {
+        uint256 totalStakedAmount;
+        uint256 lastWithrewTime;
+        uint256 lockedTo;
+    }
 
     mapping(uint256 => uint256) private _epochRewards;
     mapping(uint256 => uint256) private _epochTotalStakedAmounts;
-    mapping(address => uint256) private _userTotalStakedAmounts;
-    mapping(address => uint256) private _userStartedTimes;
     mapping(uint256 => mapping (address => uint256)) private _userEpochStakedAmounts;
+    mapping(address => StakerInfo) private _stakers;
 
     // Events
     event Staked(address indexed account, uint256 amount);
     event Unstaked(address indexed account, uint256 amount);
+    event EnabledLock(address indexed governance);
+    event DisabledLock(address indexed governance);
+    event ChangedMaximumLockPeriod(address indexed governance, uint256 value);
+    event ChangedMinimumLockPeriod(address indexed governance, uint256 value);
     event ChangedRewardPeriod(address indexed governance, uint256 value);
     event ChangedUniswapV2Pair(address indexed governance, address indexed uniswapV2Pair);
     event ChangedNeonAddress(address indexed governance, address indexed neonAddress);
@@ -52,11 +66,24 @@ contract NEONVault is Context, Ownable {
         _;
     }
 
+    modifier onlyUnlocked() {
+        require(
+            !isEnabledLock() || 
+            _stakers[_msgSender()].lockedTo > 0 &&
+            block.timestamp >= _stakers[_msgSender()].lockedTo,
+            "Staking pool is locked"
+        );
+        _;
+    }
+
     constructor() {
         _rewardPeriod = 1 days;
         _contractStartTime = block.timestamp;
         _lastRewardedTime = _contractStartTime;
         _devFee = 400;
+        _maxLockPeriod = 365 days; // around 1 year
+        _minLockPeriod = 90 days;  // around 3 months
+        _enabledLock = true;
     }
 
     /**
@@ -71,6 +98,45 @@ contract NEONVault is Context, Ownable {
      */
     function contractStartTime() external view returns (uint256) {
         return _contractStartTime;
+    }
+
+    /**
+     * @dev Enable lock functionality. Call by only Governance.
+     */
+    function enableLock() external onlyGovernance {
+        _enabledLock = true;
+        emit EnabledLock(governance());
+    }
+
+    /**
+     * @dev Disable lock functionality. Call by only Governance.
+     */
+    function disableLock() external onlyGovernance {
+        _enabledLock = false;
+        emit DisabledLock(governance());
+    }
+
+    /**
+     * @dev Disable lock functionality. Call by only Governance.
+     */
+    function isEnabledLock() public view returns (bool) {
+        return _enabledLock;
+    }
+
+    /**
+     * @dev Change maximun lock period. Call by only Governance.
+     */
+    function changedMaximumLockPeriod(uint256 maxLockPeriod_) external onlyGovernance {
+        _maxLockPeriod = maxLockPeriod_;
+        emit ChangedMaximumLockPeriod(governance(), _maxLockPeriod);
+    }
+
+    /**
+     * @dev Change minimum lock period. Call by only Governance.
+     */
+    function changedMinimumLockPeriod(uint256 minLockPeriod_) external onlyGovernance {
+        _minLockPeriod = minLockPeriod_;
+        emit ChangedMinimumLockPeriod(governance(), _minLockPeriod);
     }
 
     /**
@@ -147,6 +213,13 @@ contract NEONVault is Context, Ownable {
     }
 
     /**
+     * @dev Return the number of stakers
+     */
+    function numberOfStakers() external view returns (uint256) {
+        return _stakerList.length;
+    }
+
+    /**
      * @dev Add fee to epoch reward variable
      * Note Call by only NEON token contract
      */
@@ -167,13 +240,14 @@ contract NEONVault is Context, Ownable {
     /**
      * @dev Stake NEON-ETH LP tokens
      */
-    function stake(uint256 amount_) external {
+    function stake(uint256 amount_, uint256 lockTime) external {
         require(!_isContract(_msgSender()), "Could not be a contract");
         require(amount_ > 0, "Staking amount must be more than zero");
+        require(lockTime <= _maxLockPeriod && lockTime >= _minLockPeriod, "Invalid lock time");
 
         // Transfer tokens from staker to the contract amount
         require(
-            IUIV2PAIR(_uniswapV2Pair).transferFrom(
+            IUniV2Pair(_uniswapV2Pair).transferFrom(
             _msgSender(),
             address(this), 
             amount_), 
@@ -186,13 +260,15 @@ contract NEONVault is Context, Ownable {
         // Increase epoch staked amount
         _epochTotalStakedAmounts[_lastRewardedTime] = _epochTotalStakedAmounts[_lastRewardedTime].add(amount_);
         
-        if (_userStartedTimes[_msgSender()] == 0) {
-            _userStartedTimes[_msgSender()] = _lastRewardedTime;
+        if (_stakers[_msgSender()].lastWithrewTime == 0) {
+            _stakers[_msgSender()].lastWithrewTime = _lastRewardedTime;
+            _stakers[_msgSender()].lockedTo = lockTime.add(block.timestamp);
+            _stakerList.push(_msgSender());
         }
 
         // Increase staked amount of the staker
         _userEpochStakedAmounts[_lastRewardedTime][_msgSender()] = _userEpochStakedAmounts[_lastRewardedTime][_msgSender()].add(amount_);
-        _userTotalStakedAmounts[_msgSender()] = _userTotalStakedAmounts[_msgSender()].add(amount_);
+        _stakers[_msgSender()].totalStakedAmount = _stakers[_msgSender()].totalStakedAmount.add(amount_);
 
         emit Staked(_msgSender(), amount_);
     }
@@ -200,14 +276,14 @@ contract NEONVault is Context, Ownable {
     /**
      * @dev Unstake staked NEON-ETH LP tokens
      */
-    function unstake() external {
+    function unstake() external onlyUnlocked {
         require(!_isContract(_msgSender()), "Could not be a contract");
-        uint256 amount = _userTotalStakedAmounts[_msgSender()];
+        uint256 amount = _stakers[_msgSender()].totalStakedAmount;
         require(amount > 0, "No running stake");
 
         // Transfer LP tokens from contract to staker
         require(
-            IUIV2PAIR(_uniswapV2Pair).transfer(
+            IUniV2Pair(_uniswapV2Pair).transfer(
             _msgSender(), 
             amount), 
             "It has failed to transfer tokens from contract to staker."
@@ -216,19 +292,29 @@ contract NEONVault is Context, Ownable {
 
         // Decrease the total staked amount
         _totalStakedAmount = _totalStakedAmount.sub(amount);
-        _userTotalStakedAmounts[_msgSender()] = _userTotalStakedAmounts[_msgSender()].sub(amount);
+        _stakers[_msgSender()].totalStakedAmount = _stakers[_msgSender()].totalStakedAmount.sub(amount);
 
         // Decrease the staker's amount
         uint256 blockTime = block.timestamp;
-        uint256 startedTime = _userStartedTimes[_msgSender()];
-        uint256 n = blockTime.sub(startedTime).div(_rewardPeriod);
+        uint256 lastWithrewTime = _stakers[_msgSender()].lastWithrewTime;
+        uint256 n = blockTime.sub(lastWithrewTime).div(_rewardPeriod);
 
         for (uint256 i = 0; i < n; i++) {
-            uint256 rewardTime = startedTime.add(_rewardPeriod.mul(i));
-            _userEpochStakedAmounts[rewardTime][_msgSender()] = 0;
+            uint256 rewardTime = lastWithrewTime.add(_rewardPeriod.mul(i));
+            if (_userEpochStakedAmounts[rewardTime][_msgSender()] != 0) {
+                _userEpochStakedAmounts[rewardTime][_msgSender()] = 0;
+            }
         }
         // Initialize started time of user
-        _userStartedTimes[_msgSender()] = 0;
+        _stakers[_msgSender()].lastWithrewTime = 0;
+
+        for (uint256 i = 0; i < _stakerList.length; i++) {
+            if (_stakerList[i] == _msgSender()) {
+                _stakerList[i] = _stakerList[_stakerList.length - 1];
+                _stakerList.pop();
+                break;
+            }
+        }
 
         emit Unstaked(_msgSender(), amount);
     }
@@ -236,26 +322,26 @@ contract NEONVault is Context, Ownable {
     /**
      * @dev API to get staker's reward
      */
-    function getReward() public view returns (uint256) {
-        require(!_isContract(_msgSender()), "Could not be a contract");
+    function getReward(address account_) public view returns (uint256, uint256) {
+        require(!_isContract(account_), "Could not be a contract");
 
         uint256 reward = 0;
         uint256 blockTime = block.timestamp;
-        uint256 startedTime = _userStartedTimes[_msgSender()];
+        uint256 lastWithrewTime = _stakers[account_].lastWithrewTime;
+        
+        if (lastWithrewTime > 0) {
+            uint256 n = blockTime.sub(lastWithrewTime).div(_rewardPeriod);
 
-        if (startedTime > 0) {
-            uint256 n = blockTime.sub(startedTime).div(_rewardPeriod);
-
-            for (uint256 i = 0; i < n; i++) {
-                uint256 rewardTime = startedTime.add(_rewardPeriod.mul(i));
-                uint256 epochRewards = _epochRewards[rewardTime];
-                uint256 epochTotalStakedAmounts = _epochTotalStakedAmounts[rewardTime];
-                uint256 stakedAmount = _userEpochStakedAmounts[rewardTime][_msgSender()];
+            for (uint256 i = 1; i <= n; i++) {
+                lastWithrewTime = lastWithrewTime.add(_rewardPeriod.mul(i));
+                uint256 epochRewards = _epochRewards[lastWithrewTime];
+                uint256 epochTotalStakedAmounts = _epochTotalStakedAmounts[lastWithrewTime];
+                uint256 stakedAmount = _userEpochStakedAmounts[lastWithrewTime][account_];
                 reward = stakedAmount.mul(epochRewards).div(epochTotalStakedAmounts).add(reward);
             }
         }
 
-        return reward;
+        return (reward, lastWithrewTime);
     }
 
     /**
@@ -297,22 +383,47 @@ contract NEONVault is Context, Ownable {
     /**
      * @dev API to get the staker's staked amount
      */
-    function userTotalStakedAmount() external view returns (uint256) {
-        return _userTotalStakedAmounts[_msgSender()];
+    function userTotalStakedAmount(address account_) external view returns (uint256) {
+        return _stakers[account_].totalStakedAmount;
     }
 
     /**
      * @dev API to get the staker's staked amount
      */
-    function userEpochStakedAmount(uint256 epoch_) external view returns (uint256) {
-        return _userEpochStakedAmounts[epoch_][_msgSender()];
+    function userEpochStakedAmount(uint256 epoch_, address account_) external view returns (uint256) {
+        return _userEpochStakedAmounts[epoch_][account_];
     }
 
     /**
      * @dev API to get the staker's started time the staking
      */
-    function userStartedTime(address account_) external view returns (uint256) {
-        return _userStartedTimes[account_];
+    function userLastWithrewTime(address account_) external view returns (uint256) {
+        return _stakers[account_].lastWithrewTime;
+    }
+
+    /**
+     * @dev API to get the staker's rank
+     */
+    function userRank(address account_) external view returns (uint256) {
+        require(account_ != address(0), "Invalid address");
+
+        uint256 rank = 1;
+        uint256 userStakedAmount = _stakers[account_].totalStakedAmount;
+        
+        for (uint256 i = 0; i < _stakerList.length; i++) {
+            address staker = _stakerList[i];
+            if ( staker != account_ && userStakedAmount < _stakers[staker].totalStakedAmount)
+                rank = rank.add(1);
+        }
+        return rank;
+    }
+
+    /**
+     * @dev API to get locked timestamp of the staker
+     */
+    function userLockedTo(address account_) external view returns (uint256) {
+        require(account_ != address(0), "Invalid address");
+        return _stakers[account_].lockedTo;
     }
 
      /**
@@ -333,7 +444,10 @@ contract NEONVault is Context, Ownable {
      * @dev Low level withdraw internal function
      */
     function _withdrawReward() internal {
-        uint256 rewards = getReward();
+        (uint256 rewards, uint256 lastWithrewTime) = getReward(_msgSender());
+
+        require(rewards > 0, "No reward state");
+
         uint256 devFeeAmount = rewards.mul(uint256(_devFee)).div(10000);
 
         // Transfer reward tokens from contract to staker
@@ -349,6 +463,9 @@ contract NEONVault is Context, Ownable {
             devFeeAmount), 
             "It has failed to transfer tokens from contract to staker."
         );
+
+        // update user's last withrew time
+        _stakers[_msgSender()].lastWithrewTime = lastWithrewTime;
 
         emit WithdrewReward(_msgSender(), rewards);
     }
