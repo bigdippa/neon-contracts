@@ -6,7 +6,7 @@ import "./Context.sol";
 import "./SafeMath.sol";
 import "./Pausable.sol";
 import "./IERC20.sol";
-import "./INEONVAULT.sol";
+import "./INEONVault.sol";
 
 /**
  * 'NEON' token contract
