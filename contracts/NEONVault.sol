@@ -124,11 +124,25 @@ contract NEONVault is Context, Ownable {
     }
 
     /**
+     * @dev Return maximum lock period.
+     */
+    function maximumLockPeriod() external view returns (uint256) {
+        return _maxLockPeriod;
+    }
+
+    /**
      * @dev Change maximun lock period. Call by only Governance.
      */
     function changedMaximumLockPeriod(uint256 maxLockPeriod_) external onlyGovernance {
         _maxLockPeriod = maxLockPeriod_;
         emit ChangedMaximumLockPeriod(governance(), _maxLockPeriod);
+    }
+
+    /**
+     * @dev Return minimum lock period.
+     */
+    function minimumLockPeriod() external view returns (uint256) {
+        return _minLockPeriod;
     }
 
     /**
@@ -281,18 +295,11 @@ contract NEONVault is Context, Ownable {
         uint256 amount = _stakers[_msgSender()].totalStakedAmount;
         require(amount > 0, "No running stake");
 
-        // Transfer LP tokens from contract to staker
-        require(
-            IUniV2Pair(_uniswapV2Pair).transfer(
-            _msgSender(), 
-            amount), 
-            "It has failed to transfer tokens from contract to staker."
-        );
         _withdrawReward();
 
         // Decrease the total staked amount
         _totalStakedAmount = _totalStakedAmount.sub(amount);
-        _stakers[_msgSender()].totalStakedAmount = _stakers[_msgSender()].totalStakedAmount.sub(amount);
+        _stakers[_msgSender()].totalStakedAmount = 0;
 
         // Decrease the staker's amount
         uint256 blockTime = block.timestamp;
@@ -316,6 +323,14 @@ contract NEONVault is Context, Ownable {
             }
         }
 
+        // Transfer LP tokens from contract to staker
+        require(
+            IUniV2Pair(_uniswapV2Pair).transfer(
+            _msgSender(), 
+            amount), 
+            "It has failed to transfer tokens from contract to staker."
+        );
+
         emit Unstaked(_msgSender(), amount);
     }
     
@@ -332,7 +347,7 @@ contract NEONVault is Context, Ownable {
         if (lastWithrewTime > 0) {
             uint256 n = blockTime.sub(lastWithrewTime).div(_rewardPeriod);
 
-            for (uint256 i = 1; i <= n; i++) {
+            for (uint256 i = 0; i < n; i++) {
                 lastWithrewTime = lastWithrewTime.add(_rewardPeriod.mul(i));
                 uint256 epochRewards = _epochRewards[lastWithrewTime];
                 uint256 epochTotalStakedAmounts = _epochTotalStakedAmounts[lastWithrewTime];
@@ -449,19 +464,18 @@ contract NEONVault is Context, Ownable {
         require(rewards > 0, "No reward state");
 
         uint256 devFeeAmount = rewards.mul(uint256(_devFee)).div(10000);
+        uint256 actualRewards = rewards.sub(devFeeAmount);
 
         // Transfer reward tokens from contract to staker
         require(
-            INEON(_neonAddress).transferWithoutFee(_msgSender(),
-            rewards.sub(devFeeAmount)), 
+            INEON(_neonAddress).transferWithoutFee(_msgSender(), actualRewards), 
             "It has failed to transfer tokens from contract to staker."
         );
 
         // Transfer devFee tokens from contract to devAddress
         require(
-            INEON(_neonAddress).transferWithoutFee(_devAddress,
-            devFeeAmount), 
-            "It has failed to transfer tokens from contract to staker."
+            INEON(_neonAddress).transferWithoutFee(_devAddress, devFeeAmount), 
+            "It has failed to transfer tokens from contract to dev address."
         );
 
         // update user's last withrew time
